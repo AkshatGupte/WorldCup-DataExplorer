@@ -1,74 +1,72 @@
 # World Cup 2026 Data Explorer
 
-World Cup 2026 Data Explorer is a full-stack football dashboard for exploring FIFA World Cup data through a conversational interface and live match views.
-
-It combines a React frontend, a FastAPI backend, SQLite data, and external football APIs to present World Cup information in a simple, readable format.
+World Cup 2026 Data Explorer is a full-stack football app for exploring FIFA World
+Cup 2026 data — ask a question in plain English and get back a real answer, a
+chart, or a stat breakdown, alongside live scores, leaderboards, and the
+knockout bracket.
 
 ## What it does
 
-- Answers natural-language questions about teams, players, matches, standings, and tournament stats
-- Returns results in readable summaries, tables, and charts
-- Shows today’s matches and live fixtures in a sidebar
-- Opens a match card to compare both teams with wins, goals scored, and top scorers
-- Displays the knockout bracket in a separate view
-- Uses live football data when available, with fallback messages when the backend is unavailable
+Type a question like *"How many World Cup goals has Messi scored?"* or *"Compare
+Messi and Mbappe's attacking stats"* and the app converts it into a database
+query behind the scenes, runs it, and returns a readable answer — with a table,
+chart, or radar comparison when one actually helps.
 
-## Main features
+## Features
 
-### Data Explorer
-- Ask questions like team comparisons, player stats, match results, and standings
-- See a generated response plus supporting records
-- View data as a table, summary cards, or a chart
+### Natural-language Data Explorer
+- Ask about teams, players, matches, standings, and tournament stats in plain English
+- Two search modes: **General** (teams, fixtures, standings, match events) and
+  **Player Stats** (ratings, xG, passing, defensive numbers) — biases the
+  question toward the right data source while still pulling in the other
+  source automatically if a question genuinely needs both
+- A collapsible **"Show SQL"** panel reveals the exact query that produced the
+  answer, for anyone curious how it works
+- Repeat questions answer instantly from cache instead of re-querying
 
-### Match sidebar
-- Browse upcoming fixtures
-- See ongoing matches with live score and match status
-- Open a match to compare both teams
+### Player stat radar charts
+- Ask for a player's stats and get an automatically-scoped radar chart —
+  defenders get defensive numbers, attackers get attacking numbers, midfielders
+  get a blended set, so you're never staring at 50 irrelevant stats
+- Ask to compare two players and get both overlaid on the same radar, so their
+  shapes are directly comparable
+- Values are normalized onto a consistent scale so a stat like pass accuracy
+  (a percentage) doesn't get dwarfed by a stat like duels won (a raw count)
+
+### Leaderboards
+- Top 10 players by expected goals (xG)
+- Teams by highest combined xG
+- Highest rated players of the tournament
+- Highest scoring teams
+- Animated, ranked bar lists — numbers count up and bars fill in on load
+
+### Live match sidebar
+- Today's matches with live scores, refreshed automatically every 15 seconds
+- A pulsing "Live Now" section for matches in progress, with a score flash the
+  moment a goal changes the scoreline
+- Click any match to open a full comparison
 
 ### Match comparison modal
-- Displays the fixture prominently
-- Shows score and match phase such as live, half time, or full time
-- Shows team statistics for both sides
+- Shows the fixture, score, and match phase (scheduled, live, half-time, full-time)
+- Compares both teams' wins, goals scored, and top scorer
+- Lists scorers for finished or in-progress matches
 
 ### Knockout bracket
-- Displays the tournament knockout stage in bracket form
-- Separates later stages such as third place and final
+- The full knockout stage in bracket form, from Round of 32 through the Final
+- Third place and the Final are shown separately from the main bracket flow
 
 ## Project structure
 
-- `backend/` — FastAPI API, SQLite helpers, sync utilities, and query routing
+- `backend/` — FastAPI API, SQLite data access, sync utilities, and the natural-language query pipeline
 - `frontend/` — React + Vite user interface
-- `worldcup.db` — local SQLite database used by the backend
 
 ## Tech stack
 
-- Frontend: React, Vite
+- Frontend: React, Vite, Plotly
 - Backend: FastAPI, Python
 - Storage: SQLite
-- Data sources: World Cup APIs and ESPN scoreboard
-
-## Deployment
-
-The backend serves the built frontend itself, so there's a single origin and no
-separate frontend host or CORS setup needed for a standard deployment.
-
-1. Build the frontend: `cd frontend && npm install && npm run build` (outputs to `frontend/dist`).
-2. Set the backend's environment variables (see `backend/.env`) on your host —
-   `GROQ_API_KEY`, `CEREBRAS_API_KEY`, `OPENROUTER_KEY`, `ZAFRONIX_KEY`, `SPORTDB_KEY`, etc.
-3. Start the API from the repo root: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
-   (a `Procfile` with this exact command is included for platforms that use one,
-   e.g. Render/Railway).
-4. Visiting the deployed URL now serves the React app directly from the API; every
-   `/query`, `/leaderboards`, `/bracket`, etc. request is same-origin.
-
-If the frontend is ever hosted separately instead, set `ALLOWED_ORIGINS` (comma-separated)
-on the backend to that origin — it defaults to the local Vite dev server only.
-
-Notes:
-- SQLite is a local file, so the host needs a persistent disk — this won't work on a
-  typical stateless/serverless platform.
-- Keep `sync3.py` / `update_recent.py` running on a schedule (cron) so match data and
-  stats stay current after the initial sync.
+- Data sources: Zafronix, Flashscore (via sportdb.dev), ESPN live scores
+- LLM: Groq, with Cerebras and OpenRouter as automatic fallbacks
 
 ## License
 
