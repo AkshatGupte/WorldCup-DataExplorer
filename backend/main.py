@@ -266,6 +266,118 @@ def leaderboards():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+_FINDER_OPERATORS = {"gte": ">=", "gt": ">", "lte": "<=", "lt": "<", "eq": "="}
+_FINDER_MAX_FILTERS = 5
+
+
+@app.get("/player-finder/options")
+def player_finder_options():
+    """Stat keys available for filtering, grouped by category, for the finder UI."""
+    try:
+        conn = sqlite3.connect(STATS_DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT stat_key, label, category FROM stat_types
+            WHERE category != 'unknown'
+            ORDER BY category, label
+        """)
+        stats = [dict(r) for r in cur.fetchall()]
+        conn.close()
+        return {"stats": stats}
+    except Exception as e:
+        logging.exception("Error fetching player-finder options")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/player-finder")
+async def player_finder(request: Request):
+    """
+    Percentile/threshold-style player search — deterministic SQL against
+    tournament_player_stats + tournament_stat_values, bypasses the LLM pipeline
+    entirely. stat_key is always bound as a query parameter (never interpolated
+    into SQL text) and additionally whitelisted against stat_types.
+    """
+    try:
+        payload = await request.json()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON: {e}")
+
+    filters = payload.get("filters") if isinstance(payload, dict) else None
+    if not isinstance(filters, list) or not filters:
+        raise HTTPException(status_code=400, detail="'filters' must be a non-empty list")
+    if len(filters) > _FINDER_MAX_FILTERS:
+        raise HTTPException(status_code=400, detail=f"Max {_FINDER_MAX_FILTERS} filters allowed")
+
+    parsed = []
+    for f in filters:
+        stat_key = f.get("stat_key") if isinstance(f, dict) else None
+        operator = f.get("operator") if isinstance(f, dict) else None
+        value = f.get("value") if isinstance(f, dict) else None
+        if not stat_key or operator not in _FINDER_OPERATORS:
+            raise HTTPException(status_code=400, detail="Each filter needs a valid stat_key and operator")
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="Filter value must be a number")
+        parsed.append((stat_key, operator, value))
+
+    try:
+        conn = sqlite3.connect(STATS_DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+
+        cur.execute("SELECT stat_key, label FROM stat_types")
+        known = {row["stat_key"]: row["label"] for row in cur.fetchall()}
+        for stat_key, _, _ in parsed:
+            if stat_key not in known:
+                raise HTTPException(status_code=400, detail=f"Unknown stat_key: {stat_key}")
+
+        # join_params and where_params are kept separate (not interleaved per
+        # filter) because sqlite binds `?` positionally against the final SQL
+        # text, where all JOINs precede all WHEREs regardless of filter order.
+        joins, wheres, selects = [], [], []
+        join_params, where_params = [], []
+        for i, (stat_key, operator, value) in enumerate(parsed):
+            alias = f"tsv{i}"
+            joins.append(
+                f"JOIN tournament_stat_values {alias} "
+                f"ON {alias}.tournament_player_stats_id = tps.id AND {alias}.stat_key = ?"
+            )
+            join_params.append(stat_key)
+            wheres.append(f"{alias}.numeric_value {_FINDER_OPERATORS[operator]} ?")
+            where_params.append(value)
+            selects.append(f"{alias}.numeric_value AS filter_{i}")
+
+        sql = f"""
+            SELECT p.display_name AS name, p.team_name AS team, p.position AS position,
+                   tps.matches_played, ROUND(tps.avg_rating, 2) AS avg_rating,
+                   {', '.join(selects)}
+            FROM tournament_player_stats tps
+            JOIN players p ON p.player_id = tps.player_id
+            {' '.join(joins)}
+            WHERE {' AND '.join(wheres)}
+            ORDER BY tps.avg_rating DESC
+            LIMIT 100
+        """
+        cur.execute(sql, join_params + where_params)
+        rows = [dict(r) for r in cur.fetchall()]
+        conn.close()
+
+        return {
+            "rows": rows,
+            "filters": [
+                {"stat_key": k, "label": known[k], "operator": o, "value": v}
+                for k, o, v in parsed
+            ],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.exception("Error running player finder query")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/query")
 async def run_query(request: Request):
     try:
