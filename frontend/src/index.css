@@ -848,11 +848,54 @@ tbody tr:nth-child(even) {
 }
 
 /* Landing page */
+.tournament-intro {
+  margin-top: 8px;
+  padding: 24px 26px;
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(242, 195, 0, 0.1), rgba(227, 27, 35, 0.08)),
+    var(--panel);
+  border: 1px solid rgba(242, 195, 0, 0.18);
+  box-shadow: var(--shadow);
+}
+
+.tournament-intro p {
+  margin: 8px 0 0;
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1.6;
+  max-width: 920px;
+}
+
+.tournament-stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(242, 195, 0, 0.16);
+}
+
+.tournament-stat-value {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.tournament-stat-label {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 .landing-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
-  margin-top: 8px;
+  margin-top: 24px;
 }
 
 @media (max-width: 900px) {

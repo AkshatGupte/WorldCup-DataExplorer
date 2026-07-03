@@ -1,3 +1,5 @@
+import { useState, useEffect } from 'react'
+
 const TOOLS = [
   {
     tab: 'explorer',
@@ -25,9 +27,57 @@ const TOOLS = [
   },
 ]
 
+function formatDate(iso) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
+}
+
 export default function LandingPage({ onNavigate }) {
+  const [overview, setOverview] = useState(null)
+
+  useEffect(() => {
+    fetch('/tournament-overview')
+      .then(res => (res.ok ? res.json() : null))
+      .then(setOverview)
+      .catch(() => setOverview(null))
+  }, [])
+
   return (
     <div className="tab-fade-in" style={{ padding: '0 24px 32px' }}>
+      <div className="tournament-intro">
+        <div className="answer-kicker">FIFA World Cup 2026</div>
+        <p>
+          The 23rd FIFA World Cup is the first ever hosted by three nations at once — the United States,
+          Mexico, and Canada — and the first played with an expanded 48-team field, up from 32. Matches
+          run {formatDate(overview?.start_date)} through {formatDate(overview?.end_date)}, opening with the
+          group stage before narrowing through a new round of 32, then the round of 16, quarter-finals,
+          semi-finals, and the final.
+        </p>
+
+        <div className="tournament-stats-row">
+          <div className="tournament-stat">
+            <div className="tournament-stat-value">{overview?.teams ?? '—'}</div>
+            <div className="tournament-stat-label">Teams</div>
+          </div>
+          <div className="tournament-stat">
+            <div className="tournament-stat-value">{overview?.matches ?? '—'}</div>
+            <div className="tournament-stat-label">Matches</div>
+          </div>
+          <div className="tournament-stat">
+            <div className="tournament-stat-value">{overview?.host_countries ?? '—'}</div>
+            <div className="tournament-stat-label">Host nations</div>
+          </div>
+          <div className="tournament-stat">
+            <div className="tournament-stat-value">{overview?.stadiums ?? '—'}</div>
+            <div className="tournament-stat-label">Stadiums</div>
+          </div>
+          <div className="tournament-stat">
+            <div className="tournament-stat-value">{overview?.confederations ?? '—'}</div>
+            <div className="tournament-stat-label">Confederations</div>
+          </div>
+        </div>
+      </div>
+
       <div className="landing-grid">
         {TOOLS.map(tool => (
           <button key={tool.tab} className="landing-card" onClick={() => onNavigate(tool.tab)}>

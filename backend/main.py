@@ -43,6 +43,42 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/tournament-overview")
+def tournament_overview():
+    """Headline tournament facts for the home page — deterministic SQL, no LLM."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+
+        cur.execute("SELECT COUNT(*) AS n FROM teams")
+        teams = cur.fetchone()["n"]
+        cur.execute("SELECT COUNT(*) AS n FROM matches")
+        matches = cur.fetchone()["n"]
+        cur.execute("SELECT COUNT(DISTINCT country) AS n FROM matches")
+        host_countries = cur.fetchone()["n"]
+        cur.execute("SELECT COUNT(DISTINCT stadium) AS n FROM matches")
+        stadiums = cur.fetchone()["n"]
+        cur.execute("SELECT COUNT(DISTINCT confederation) AS n FROM teams")
+        confederations = cur.fetchone()["n"]
+        cur.execute("SELECT MIN(date) AS start, MAX(date) AS end FROM matches")
+        dates = cur.fetchone()
+        conn.close()
+
+        return {
+            "teams": teams,
+            "matches": matches,
+            "host_countries": host_countries,
+            "stadiums": stadiums,
+            "confederations": confederations,
+            "start_date": dates["start"],
+            "end_date": dates["end"],
+        }
+    except Exception as e:
+        logging.exception("Error building tournament overview")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/upcoming")
 def upcoming(limit: int = 10):
     try:
