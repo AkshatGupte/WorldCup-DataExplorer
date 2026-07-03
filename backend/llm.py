@@ -26,9 +26,9 @@ except ImportError:
 load_dotenv(Path(__file__).resolve().parent / ".env")
 logger = logging.getLogger(__name__)
 
-# --- Multi-provider failover (Groq -> Cerebras -> OpenRouter) — active. ---
-# --- Combined capacity across 3 free tiers survives much longer than any single ---
-# --- provider's rate limit (Gemini's free tier below is only 20 req/day). ---
+# --- Multi-provider failover (OpenAI -> Groq -> Cerebras -> OpenRouter) — active. ---
+# --- OpenAI is primary (paid $5 credit, best quality); the free-tier providers ---
+# --- behind it are pure fallback once that credit runs out or OpenAI has an outage. ---
 
 # Errors worth failing over to the next provider for — the provider is rate
 # limited, down, or timed out. Anything else (bad request, auth) is a real
@@ -39,13 +39,20 @@ _FAILOVER_ERRORS = (
 )
 
 # (name, client, strong model, fast model) — tried in order, falling over to
-# the next provider on rate limit / outage. Groq first (fastest, cheapest for
-# these models), then Cerebras, then OpenRouter as the broadest last resort.
+# the next provider on rate limit / outage. OpenAI first (paid, primary),
+# then the free-tier providers as fallback if the $5 credit runs dry or OpenAI
+# has an outage: Groq, then Cerebras, then OpenRouter as the broadest last resort.
 # max_retries=0 on every client: both SDKs retry 429/5xx internally by default
 # (with their own backoff, up to ~60s) BEFORE raising — that swallows the error
 # our failover loop is waiting to catch, so a "stuck" provider blocks the whole
 # chain instead of failing over immediately. Disabling it makes failover instant.
 _PROVIDERS = [
+    (
+        "openai",
+        OpenAI(api_key=os.getenv("OPENAI_API_KEY"), max_retries=0),
+        "gpt-5.4-mini",   # SQL generation, combining, verification — needs strong reasoning
+        "gpt-5.4-nano",   # routing/classification, viz type — simple JSON decisions
+    ),
     (
         "groq",
         Groq(api_key=os.getenv("GROQ_API_KEY"), max_retries=0),
