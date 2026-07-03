@@ -6,6 +6,11 @@ export const CHART_TEXT = '#f7f5ee'
 export const CHART_MUTED = '#b6b0a0'
 export const CHART_GRID = 'rgba(247, 245, 238, 0.14)'
 export const RADAR_MAX_AXES = 8
+// Plotly's autosize only resolves width reliably from a flex/grid parent — height
+// has to come from somewhere concrete, or the container (sized by its own content,
+// which includes the chart) creates a circular sizing dependency that Plotly can
+// resolve to ~0px depending on render timing. An explicit height sidesteps that.
+export const CHART_HEIGHT = 460
 
 // Hides Plotly's default toolbar (zoom/pan/box-select/lasso-select/download) — several
 // of those tools are no-ops on a polar/radar chart and look broken when clicked; none of
@@ -14,6 +19,7 @@ export const chartConfig = { displayModeBar: false, responsive: true }
 
 export const baseChartLayout = {
   autosize: true,
+  height: CHART_HEIGHT,
   margin: { t: 40, b: 60, l: 50, r: 20 },
   paper_bgcolor: 'transparent',
   plot_bgcolor: 'transparent',

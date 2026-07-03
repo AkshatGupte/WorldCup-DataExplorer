@@ -1,6 +1,6 @@
 import Plot from 'react-plotly.js'
 import {
-  CHART_ACCENT, CHART_ACCENT_2, CHART_TEXT, CHART_MUTED, CHART_GRID,
+  CHART_ACCENT, CHART_ACCENT_2, CHART_TEXT, CHART_MUTED, CHART_GRID, CHART_HEIGHT,
   RADAR_MAX_AXES, chartConfig, baseChartLayout, STAT_SCALE_MAX, isRateStat, formatLabel
 } from '../chartTheme'
 
@@ -59,7 +59,7 @@ function RadarChart({ labels, series, title, chartKey }) {
     showlegend: series.length > 1,
     legend: { font: { color: CHART_TEXT, size: 14 }, orientation: 'h', x: 0.5, xanchor: 'center', y: -0.1 }
   }
-  return <Plot key={chartKey} data={data} layout={layout} config={chartConfig} style={{ width: '100%', minWidth: 0, flex: '1 1 320px' }} useResizeHandler />
+  return <Plot key={chartKey} data={data} layout={layout} config={chartConfig} style={{ width: '100%', minWidth: 0, height: CHART_HEIGHT, flex: '1 1 320px' }} useResizeHandler />
 }
 
 export default function ChartRenderer({ rows, viz }) {
@@ -119,14 +119,14 @@ export default function ChartRenderer({ rows, viz }) {
       const series1 = series.map(s => ({ ...s, values: s.values.slice(0, mid) }))
       const series2 = series.map(s => ({ ...s, values: s.values.slice(mid) }))
       return (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, width: '100%', marginBottom: 24 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, width: '100%', minHeight: CHART_HEIGHT, marginBottom: 24 }}>
           <RadarChart labels={labels1} series={series1} title={`${title} (1/2)`} chartKey="radar-1" />
           <RadarChart labels={labels2} series={series2} title={`${title} (2/2)`} chartKey="radar-2" />
         </div>
       )
     }
 
-    return <div style={{ width: '100%', marginBottom: 24 }}><RadarChart labels={labels} series={series} title={title} chartKey="radar-single" /></div>
+    return <div style={{ width: '100%', minHeight: CHART_HEIGHT, marginBottom: 24 }}><RadarChart labels={labels} series={series} title={title} chartKey="radar-single" /></div>
   }
 
   const x = rows.map(r => r[viz.x])
@@ -146,5 +146,5 @@ export default function ChartRenderer({ rows, viz }) {
     return null
   }
 
-  return <Plot data={data} layout={layout} config={chartConfig} style={{ width: '100%', marginBottom: 24 }} useResizeHandler />
+  return <Plot data={data} layout={layout} config={chartConfig} style={{ width: '100%', height: CHART_HEIGHT, marginBottom: 24 }} useResizeHandler />
 }
