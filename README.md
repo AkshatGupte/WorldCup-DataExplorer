@@ -1,4 +1,4 @@
-# World Cup 2026 Data Explorer
+# [World Cup 2026 Data Explorer](https://worldcup-dataexplorer.onrender.com/)
 
 World Cup 2026 Data Explorer is a full-stack football app for exploring FIFA World
 Cup 2026 data — ask a question in plain English and get back a real answer, a
