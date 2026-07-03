@@ -24,9 +24,12 @@ yarn-error.log*
 ### Local database / generated files
 *.db-shm
 *.db-wal
-worldcup.db
-worldcup_fd.db
-worldcup_stats.db
+# Root-level copies are stale empty stubs, not the real data (that lives in backend/) — ignored.
+/worldcup.db
+/worldcup_fd.db
+/worldcup_stats.db
+# backend/'s .db files ARE committed on purpose: this app needs the data to exist
+# wherever it's deployed, and there's no persistent-disk hosting in the current plan.
 
 ### OS / editor
 .DS_Store

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import Plot from 'react-plotly.js'
 import Bracket from './Bracket'
 
@@ -40,6 +40,54 @@ function isRateStat(label) {
   return /Accuracy|Efficiency/i.test(label) || label === 'fsRating'
 }
 
+// Animates a number counting up from 0 to `target` — used on leaderboard values so
+// they feel alive on first render instead of just appearing as static text.
+function useCountUp(target, duration = 900) {
+  const [value, setValue] = useState(0)
+  useEffect(() => {
+    let raf
+    const start = performance.now()
+    const from = 0
+    const tick = now => {
+      const t = Math.min(1, (now - start) / duration)
+      const eased = 1 - Math.pow(1 - t, 3) // ease-out cubic
+      setValue(from + (target - from) * eased)
+      if (t < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [target, duration])
+  return value
+}
+
+// One leaderboard row as a real component (not a plain function called in a loop) —
+// useCountUp is a hook, and hooks can only run inside an actual component instance,
+// not inside a .map() callback in a shared parent's render. Bar fill and the number
+// both animate in together, staggered per rank for a cascading reveal.
+function LeaderboardRow({ rank, item, maxValue, subtitleKey, valueFormatter }) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), rank * 60)
+    return () => clearTimeout(t)
+  }, [rank])
+  const animatedValue = useCountUp(mounted ? item.value : 0, 700)
+  const pct = Math.max(4, (item.value / maxValue) * 100)
+
+  return (
+    <div className="leaderboard-row">
+      <div className="leaderboard-rank">{rank}</div>
+      <div className="leaderboard-identity">
+        <div className="leaderboard-name">{item.name || item.team}</div>
+        {item[subtitleKey] && item.name && <div className="leaderboard-subtitle">{item[subtitleKey]}</div>}
+      </div>
+      <div className="leaderboard-bar-track">
+        <div className="leaderboard-bar-fill" style={{ width: mounted ? `${pct}%` : '0%' }} />
+      </div>
+      <div className="leaderboard-value">{valueFormatter ? valueFormatter(animatedValue) : Math.round(animatedValue)}</div>
+    </div>
+  )
+}
+
 export default function App() {
   const [question, setQuestion] = useState('')
   const [answeredQuestion, setAnsweredQuestion] = useState('')
@@ -48,6 +96,8 @@ export default function App() {
   const [error, setError] = useState(null)
   const [apiError, setApiError] = useState(null)
   const [upcoming, setUpcoming] = useState(null)
+  const [flashingMatches, setFlashingMatches] = useState({})
+  const previousScores = useRef({})
   const [selectedMatch, setSelectedMatch] = useState(null)
   const [teamStats, setTeamStats] = useState(null)
   const [statsLoading, setStatsLoading] = useState(false)
@@ -131,6 +181,32 @@ export default function App() {
       }
       const data = await res.json()
       setApiError(null)
+
+      // flash a match's scoreline when its score actually changes between polls —
+      // a quiet cue that something just happened without needing a full refresh
+      const newlyChanged = []
+      for (const m of data) {
+        const key = `${m.home?.name}-${m.away?.name}`
+        const scoreKey = `${m.home_score ?? ''}-${m.away_score ?? ''}`
+        const prev = previousScores.current[key]
+        if (prev !== undefined && prev !== scoreKey) newlyChanged.push(key)
+        previousScores.current[key] = scoreKey
+      }
+      if (newlyChanged.length) {
+        setFlashingMatches(prev => {
+          const next = { ...prev }
+          newlyChanged.forEach(k => { next[k] = true })
+          return next
+        })
+        setTimeout(() => {
+          setFlashingMatches(prev => {
+            const next = { ...prev }
+            newlyChanged.forEach(k => { delete next[k] })
+            return next
+          })
+        }, 2200)
+      }
+
       setUpcoming(data)
     } catch (e) {
       console.error('Failed to load today matches', e)
@@ -372,17 +448,14 @@ export default function App() {
         <div className="leaderboard-card-title">{title}</div>
         <div className="leaderboard-rows">
           {items.map((item, i) => (
-            <div className="leaderboard-row" key={i}>
-              <div className="leaderboard-rank">{i + 1}</div>
-              <div className="leaderboard-identity">
-                <div className="leaderboard-name">{item.name || item.team}</div>
-                {item[subtitleKey] && item.name && <div className="leaderboard-subtitle">{item[subtitleKey]}</div>}
-              </div>
-              <div className="leaderboard-bar-track">
-                <div className="leaderboard-bar-fill" style={{ width: `${Math.max(4, (item.value / maxValue) * 100)}%` }} />
-              </div>
-              <div className="leaderboard-value">{valueFormatter ? valueFormatter(item.value) : item.value}</div>
-            </div>
+            <LeaderboardRow
+              key={i}
+              rank={i + 1}
+              item={item}
+              maxValue={maxValue}
+              subtitleKey={subtitleKey}
+              valueFormatter={valueFormatter}
+            />
           ))}
         </div>
       </div>
@@ -461,6 +534,23 @@ export default function App() {
     )
   }
 
+  function renderLeaderboardsSkeleton() {
+    return (
+      <div className="leaderboard-grid">
+        {[0, 1, 2, 3].map(card => (
+          <div className="leaderboard-card" key={card}>
+            <div className="skeleton-line skeleton-section-title" />
+            <div className="leaderboard-rows" style={{ marginTop: 14 }}>
+              {[0, 1, 2, 3, 4].map(row => (
+                <div className="skeleton-table-row" key={row} style={{ opacity: 1 - row * 0.15 }} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
 return (
     <div className="app-layout">
       <div className="header">
@@ -472,6 +562,7 @@ return (
       <div style={{ display: "flex", gap: 8, padding: "0 24px", marginBottom: 8 }}>
         {['explorer', 'leaderboards', 'bracket'].map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
+            className="nav-tab-button"
             style={{
               padding: "10px 22px", borderRadius: 8, border: "none",
               cursor: "pointer", fontSize: 16, fontWeight: 600,
@@ -485,7 +576,7 @@ return (
 
       {apiError && <div className="error-banner" style={{ maxWidth: 'calc(100% - 48px)' }}>{apiError}</div>}
 
-      {activeTab === 'explorer' && <>
+      {activeTab === 'explorer' && <div className="tab-fade-in">
         <div className="search-section">
           <div className="mode-toggle">
             {[['general', 'General'], ['player', 'Player Stats']].map(([m, label]) => (
@@ -536,10 +627,10 @@ return (
                 {result.sql && (result.sql.primary || result.sql.secondary) && (
                   <div className="sql-panel">
                     <button className="sql-toggle" onClick={() => setShowSql(v => !v)}>
-                      {showSql ? '▾' : '▸'} {showSql ? 'Hide' : 'Show'} SQL
+                      <span className={`sql-toggle-arrow${showSql ? ' open' : ''}`}>▸</span> {showSql ? 'Hide' : 'Show'} SQL
                     </button>
                     {showSql && (
-                      <div className="sql-content">
+                      <div className="sql-content tab-fade-in">
                         {result.sql.primary && (
                           <>
                             <div className="sql-label">Primary</div>
@@ -635,7 +726,9 @@ return (
                             {m.home.logo && <img src={m.home.logo} alt={m.home.name} className="team-logo" />}
                             <span>{m.home.name}</span>
                           </div>
-                          <div className="scoreline">{m.home_score ?? '0'} - {m.away_score ?? '0'}</div>
+                          <div className={`scoreline${flashingMatches[`${m.home?.name}-${m.away?.name}`] ? ' score-flash' : ''}`}>
+                            {m.home_score ?? '0'} - {m.away_score ?? '0'}
+                          </div>
                           <div className="match-team">
                             {m.away.logo && <img src={m.away.logo} alt={m.away.name} className="team-logo" />}
                             <span>{m.away.name}</span>
@@ -827,25 +920,25 @@ return (
             </div>
           )}
         </div>
-      </>}
+      </div>}
 
       {activeTab === 'leaderboards' && (
-        <div style={{ padding: "0 24px 24px" }}>
-          {leaderboardsLoading && <p className="muted">Loading leaderboards…</p>}
+        <div className="tab-fade-in" style={{ padding: "0 24px 24px" }}>
+          {leaderboardsLoading && renderLeaderboardsSkeleton()}
           {leaderboardsError && <div className="error-banner">{leaderboardsError}</div>}
           {leaderboards && (
             <div className="leaderboard-grid">
               {renderLeaderboardCard('Top 10 Players by xG', leaderboards.top_players_xg, v => v.toFixed(2))}
               {renderLeaderboardCard('Teams by Highest xG', leaderboards.top_teams_xg, v => v.toFixed(2), null)}
               {renderLeaderboardCard('Highest Rated Players', leaderboards.top_rated_players, v => v.toFixed(1))}
-              {renderLeaderboardCard('Highest Scoring Teams', leaderboards.top_scoring_teams, v => v, null)}
+              {renderLeaderboardCard('Highest Scoring Teams', leaderboards.top_scoring_teams, v => Math.round(v), null)}
             </div>
           )}
         </div>
       )}
 
       {activeTab === 'bracket' && (
-        <div style={{ padding: "0 24px" }}>
+        <div className="tab-fade-in" style={{ padding: "0 24px" }}>
           <Bracket />
         </div>
       )}

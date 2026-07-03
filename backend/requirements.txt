@@ -1,6 +1,7 @@
 apscheduler
 fastapi
 groq
+openai
 python-dotenv
 requests
 uvicorn[standard]

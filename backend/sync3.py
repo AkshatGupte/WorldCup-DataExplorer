@@ -1051,6 +1051,55 @@ def log_sync_complete(
     )
 
 
+def prune_non_world_cup_data(cur: sqlite3.Cursor, conn: sqlite3.Connection) -> None:
+    """
+    Delete match-level data for matches tagged as qualifiers/other competitions
+    (is_world_cup = 0) and reclaim the freed space. worldcup_stats.db is committed
+    to git for deployment (no persistent server disk in the current hosting setup),
+    so keeping it free of the ~75% of rows the app never queries anyway matters for
+    repo/push size, not just tidiness. Must run after tag_world_cup_matches() and
+    rebuild_tournament_stats() in the same sync, since aggregates need the raw match
+    data present to compute from before it's deleted.
+    """
+    cur.execute(
+        """
+        DELETE FROM match_stat_values WHERE match_player_stats_id IN (
+            SELECT id FROM match_player_stats WHERE match_id NOT IN
+                (SELECT match_id FROM match_world_cup_flag WHERE is_world_cup = 1)
+        )
+        """
+    )
+    cur.execute(
+        """
+        DELETE FROM match_player_stats WHERE match_id NOT IN
+            (SELECT match_id FROM match_world_cup_flag WHERE is_world_cup = 1)
+        """
+    )
+    cur.execute(
+        """
+        DELETE FROM goalkeeper_stat_values WHERE goalkeeper_match_stats_id IN (
+            SELECT id FROM goalkeeper_match_stats WHERE match_id NOT IN
+                (SELECT match_id FROM match_world_cup_flag WHERE is_world_cup = 1)
+        )
+        """
+    )
+    cur.execute(
+        """
+        DELETE FROM goalkeeper_match_stats WHERE match_id NOT IN
+            (SELECT match_id FROM match_world_cup_flag WHERE is_world_cup = 1)
+        """
+    )
+    cur.execute(
+        """
+        DELETE FROM awards WHERE match_id IS NOT NULL AND match_id NOT IN
+            (SELECT match_id FROM match_world_cup_flag WHERE is_world_cup = 1)
+        """
+    )
+    cur.execute("DELETE FROM match_world_cup_flag WHERE is_world_cup = 0")
+    conn.commit()
+    conn.execute("VACUUM")  # must run outside any open transaction
+
+
 def sync(fetch_profiles: bool = True, match_ids: list[str] | None = None) -> None:
     """
     Sync player stats from SportDB.dev into worldcup_stats.db.
@@ -1108,6 +1157,10 @@ def sync(fetch_profiles: bool = True, match_ids: list[str] | None = None) -> Non
         print("Rebuilding tournament aggregates ...")
         rebuild_tournament_stats(cur)
         conn.commit()
+
+        print("Pruning non-World-Cup match data (keeps the committed .db small) ...")
+        prune_non_world_cup_data(cur, conn)
+
         log_sync_complete(cur, log_id, processed)
         conn.commit()
         print("Player stats sync complete.")
