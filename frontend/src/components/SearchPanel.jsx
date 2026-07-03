@@ -28,8 +28,8 @@ export default function SearchPanel({ question, setQuestion, queryMode, setQuery
       </div>
       <p className="search-hint">
         {queryMode === 'player'
-          ? 'Player Stats mode — ratings, xG, passing, defensive stats. Use full names like "Lionel Messi".'
-          : 'General mode — teams, fixtures, standings, match events. Use full names like "Lionel Messi" or "Brazil".'}
+          ? 'Player Stats mode — ratings, xG, passing, defensive stats.'
+          : 'General mode — teams, fixtures, standings, match events.'}
       </p>
     </div>
   )
