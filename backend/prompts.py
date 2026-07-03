@@ -320,7 +320,18 @@ Other rules:
 - For "latest match" ORDER BY date DESC LIMIT 1
 - For aggregations use GROUP BY + ORDER BY + LIMIT
 - Use clear column aliases
-- Only return columns that answer the question
+- Only return columns that answer the question, BUT always also include identifying/context
+  columns even when not explicitly asked for — a bare number is meaningless without knowing
+  who/what it belongs to:
+  - Match-level questions (score, result, stats) -> always include home_team AND away_team,
+    not just home_score/away_score. Include date/stage too when reasonably relevant.
+  - Player-level questions -> always include display_name (and team_name when useful).
+  - Team-level questions -> always include the team name.
+  Example — "Give Belgium's latest score" must NOT return just (home_score, away_score):
+  SELECT home_team, away_team, home_score, away_score, date
+  FROM matches
+  WHERE (home_team = 'Belgium' OR away_team = 'Belgium')
+  ORDER BY date DESC LIMIT 1
 - For score questions use matches table with COALESCE pattern if needed
 """
 
@@ -421,7 +432,10 @@ AND msv.stat_key IN ('goals','assistsGoal','expectedGoals','shotsOnTarget','bigC
 
 Rules:
 - Use clear aliases
-- Only return columns that answer the question
+- Only return columns that answer the question, BUT always also include identifying/context
+  columns even when not explicitly asked for — a bare number is meaningless without knowing
+  who/what it belongs to. Player questions -> always include display_name (and team_name when
+  useful). Match-level questions -> always include both team names, not just a score/stat value.
 - For aggregations use GROUP BY + ORDER BY + LIMIT
 """
 

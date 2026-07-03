@@ -93,6 +93,7 @@ export default function App() {
   const [answeredQuestion, setAnsweredQuestion] = useState('')
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [loadingElapsed, setLoadingElapsed] = useState(0)
   const [error, setError] = useState(null)
   const [apiError, setApiError] = useState(null)
   const [upcoming, setUpcoming] = useState(null)
@@ -114,6 +115,25 @@ export default function App() {
     const interval = setInterval(loadUpcoming, 15000)
     return () => clearInterval(interval)
   }, [])
+
+  // response times vary a lot here (a few seconds normally, up to a minute if the
+  // LLM provider chain has to fail over) — track elapsed time so the loading state
+  // can reassure the user instead of looking frozen during a long wait. Reset of
+  // loadingElapsed happens in handleSubmit (the event that starts loading), not here —
+  // this effect only subscribes to the interval while loading is true.
+  useEffect(() => {
+    if (!loading) return
+    const start = Date.now()
+    const interval = setInterval(() => setLoadingElapsed(Math.floor((Date.now() - start) / 1000)), 1000)
+    return () => clearInterval(interval)
+  }, [loading])
+
+  function getLoadingMessage(elapsed) {
+    if (elapsed < 5) return 'Loading response…'
+    if (elapsed < 15) return 'Still working — analyzing your question…'
+    if (elapsed < 30) return 'This is taking a little longer than usual…'
+    return 'Hang tight — retrying with a backup data provider…'
+  }
 
   useEffect(() => {
     if (activeTab === 'leaderboards' && !leaderboards && !leaderboardsLoading) {
@@ -138,6 +158,7 @@ export default function App() {
   async function handleSubmit() {
     if (!question.trim()) return
     setLoading(true)
+    setLoadingElapsed(0)
     setError(null)
     setApiError(null)
     setShowSql(false)
@@ -294,6 +315,11 @@ export default function App() {
     font: { color: CHART_TEXT, size: 14 }
   }
 
+  // Hides Plotly's default toolbar (zoom/pan/box-select/lasso-select/download) — several
+  // of those tools are no-ops on a polar/radar chart and look broken when clicked; none of
+  // them are needed for a quick chart accompanying a text answer in this app.
+  const chartConfig = { displayModeBar: false, responsive: true }
+
   // labels: shared axis order (stat_key strings). series: [{ name, values, color }] —
   // values aligned 1:1 with labels. One series = single-player radar; two = overlaid
   // head-to-head comparison on the exact same axes.
@@ -319,14 +345,16 @@ export default function App() {
       })
       return {
         type: "scatterpolar",
+        mode: "lines+markers",
         r: [...normalized, normalized[0]],
         theta: [...theta, theta[0]],
         text: [...rawText, rawText[0]],
         hovertemplate: '%{text}<extra></extra>',
+        hoveron: "points",
         fill: "toself",
         fillcolor: s.color === CHART_ACCENT ? 'rgba(242, 195, 0, 0.25)' : 'rgba(227, 27, 35, 0.25)',
         line: { color: s.color, width: 2 },
-        marker: { color: s.color, size: 6 },
+        marker: { color: s.color, size: 8 },
         name: s.name
       }
     })
@@ -335,6 +363,7 @@ export default function App() {
       ...baseChartLayout,
       title: { text: title, font: { color: CHART_TEXT, size: 18 } },
       margin: { t: 55, b: series.length > 1 ? 76 : 44, l: 44, r: 44 },
+      hovermode: "closest",
       polar: {
         bgcolor: 'transparent',
         radialaxis: {
@@ -346,7 +375,7 @@ export default function App() {
       showlegend: series.length > 1,
       legend: { font: { color: CHART_TEXT, size: 14 }, orientation: 'h', x: 0.5, xanchor: 'center', y: -0.1 }
     }
-    return <Plot key={key} data={data} layout={layout} style={{ width: '100%', minWidth: 0, flex: '1 1 320px' }} useResizeHandler />
+    return <Plot key={key} data={data} layout={layout} config={chartConfig} style={{ width: '100%', minWidth: 0, flex: '1 1 320px' }} useResizeHandler />
   }
 
   function renderChart(rows, viz) {
@@ -433,7 +462,7 @@ export default function App() {
       return null
     }
 
-    return <Plot data={data} layout={layout} style={{ width: '100%', marginBottom: 24 }} useResizeHandler />
+    return <Plot data={data} layout={layout} config={chartConfig} style={{ width: '100%', marginBottom: 24 }} useResizeHandler />
   }
 
   // Ranked magnitude list — one sequential hue (gold), bar length is the only
@@ -494,6 +523,11 @@ export default function App() {
   function renderLoadingSkeleton() {
     return (
       <div className="result-shell">
+        <div className="loading-banner">
+          <span className="loading-dot" />
+          {getLoadingMessage(loadingElapsed)}
+        </div>
+
         <div className="answer-header">
           <div>
             <div className="answer-kicker">Answer</div>
