@@ -1,8 +1,9 @@
 import sqlite3
-from pathlib import Path 
+from pathlib import Path
 
-DB_PATH       = "worldcup.db"
-STATS_DB_PATH = "worldcup_stats.db"
+BASE_DIR = Path(__file__).resolve().parent
+DB_PATH       = BASE_DIR / "worldcup.db"
+STATS_DB_PATH = BASE_DIR / "worldcup_stats.db"
 
 def get_conn():
     conn = sqlite3.connect(DB_PATH)

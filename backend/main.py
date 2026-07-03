@@ -9,14 +9,10 @@ import sqlite3
 
 try:
     from .agent import run
-    from .sync import get as external_get, sync as sync_zafronix
-    from .sync2 import sync as sync_footballdata
-    from .update import update_recent
+    from .sync import get as external_get
 except ImportError:
     from agent import run
-    from sync import get as external_get, sync as sync_zafronix
-    from sync2 import sync as sync_footballdata
-    from update import update_recent
+    from sync import get as external_get
 
 logging.basicConfig(level=logging.INFO)
 
@@ -291,22 +287,22 @@ async def run_query(request: Request):
 @app.get("/bracket")
 def bracket():
     try:
-        conn = sqlite3.connect("worldcup_fd.db")
+        conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
         cur.execute("""
-            SELECT id, stage, home_team, away_team, 
+            SELECT id, stage, home_team, away_team,
                    home_score, away_score, status
-            FROM fd_matches
-            WHERE stage != 'GROUP_STAGE'
-            ORDER BY 
+            FROM matches
+            WHERE stage NOT LIKE 'group_%'
+            ORDER BY
                 CASE stage
-                    WHEN 'LAST_32'      THEN 1
-                    WHEN 'LAST_16'      THEN 2
-                    WHEN 'QUARTER_FINALS' THEN 3
-                    WHEN 'SEMI_FINALS'  THEN 4
-                    WHEN 'THIRD_PLACE'  THEN 5
-                    WHEN 'FINAL'        THEN 6
+                    WHEN 'r32'        THEN 1
+                    WHEN 'r16'        THEN 2
+                    WHEN 'qf'         THEN 3
+                    WHEN 'sf'         THEN 4
+                    WHEN 'thirdPlace' THEN 5
+                    WHEN 'final'      THEN 6
                 END, id
         """)
         rows = [dict(r) for r in cur.fetchall()]
@@ -324,17 +320,17 @@ def bracket():
                 "home_score": r["home_score"],
                 "away_score": r["away_score"],
                 "status":     r["status"],
-                "finished":   r["status"] == "FINISHED"
+                "finished":   r["status"] == "finished"
             })
 
         return {
             "stages": [
-                {"name": "Round of 32",    "key": "LAST_32",        "matches": stages.get("LAST_32", [])},
-                {"name": "Round of 16",    "key": "LAST_16",        "matches": stages.get("LAST_16", [])},
-                {"name": "Quarter Finals", "key": "QUARTER_FINALS", "matches": stages.get("QUARTER_FINALS", [])},
-                {"name": "Semi Finals",    "key": "SEMI_FINALS",    "matches": stages.get("SEMI_FINALS", [])},
-                {"name": "Third Place",    "key": "THIRD_PLACE",    "matches": stages.get("THIRD_PLACE", [])},
-                {"name": "Final",          "key": "FINAL",          "matches": stages.get("FINAL", [])},
+                {"name": "Round of 32",    "key": "r32",        "matches": stages.get("r32", [])},
+                {"name": "Round of 16",    "key": "r16",        "matches": stages.get("r16", [])},
+                {"name": "Quarter Finals", "key": "qf",         "matches": stages.get("qf", [])},
+                {"name": "Semi Finals",    "key": "sf",         "matches": stages.get("sf", [])},
+                {"name": "Third Place",    "key": "thirdPlace", "matches": stages.get("thirdPlace", [])},
+                {"name": "Final",          "key": "final",      "matches": stages.get("final", [])},
             ]
         }
     except Exception as e:
