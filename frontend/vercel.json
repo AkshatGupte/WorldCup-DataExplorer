@@ -1,0 +1,14 @@
+{
+  "rewrites": [
+    { "source": "/health", "destination": "https://worldcup-dataexplorer.onrender.com/health" },
+    { "source": "/tournament-overview", "destination": "https://worldcup-dataexplorer.onrender.com/tournament-overview" },
+    { "source": "/upcoming", "destination": "https://worldcup-dataexplorer.onrender.com/upcoming" },
+    { "source": "/today-matches", "destination": "https://worldcup-dataexplorer.onrender.com/today-matches" },
+    { "source": "/team-stats/:path*", "destination": "https://worldcup-dataexplorer.onrender.com/team-stats/:path*" },
+    { "source": "/bracket", "destination": "https://worldcup-dataexplorer.onrender.com/bracket" },
+    { "source": "/leaderboards", "destination": "https://worldcup-dataexplorer.onrender.com/leaderboards" },
+    { "source": "/player-finder/options", "destination": "https://worldcup-dataexplorer.onrender.com/player-finder/options" },
+    { "source": "/player-finder", "destination": "https://worldcup-dataexplorer.onrender.com/player-finder" },
+    { "source": "/query", "destination": "https://worldcup-dataexplorer.onrender.com/query" }
+  ]
+}
