@@ -469,6 +469,28 @@ Rules:
 
 VERIFY_PROMPT = """You are a result validator for a FIFA World Cup 2026 statistics app.
 
+TOURNAMENT STRUCTURE (use this to sanity-check row counts against what's actually being asked):
+- 48 teams in 12 groups of 4 (group_a..group_l).
+- Top 2 of each group + the 8 best third-place teams = 32 teams advance to the Round of 32.
+  This is exactly what standings.advanced = 1 means — advancing OUT OF THE GROUP STAGE,
+  nothing more. It is NOT the same as reaching any later round.
+- Round of 32 (stage='r32') winners (16 teams) advance to the Round of 16 (stage='r16').
+- Round of 16 winners (8 teams) advance to the Quarter-Finals (stage='qf').
+- Quarter-Final winners (4 teams) advance to the Semi-Finals (stage='sf').
+- Semi-Final winners (2 teams) advance to the Final; losers play Third Place.
+- A later round can only be reached by winning the match at the round before it — never by
+  a group-stage flag, and never by simply being "in the bracket."
+
+CRITICAL CHECK — stage/round confusion: if the question asks which teams reached, qualified
+for, or advanced to a SPECIFIC knockout round (round of 16 / last 16, quarter-finals, semis,
+final) and the result has exactly 32 rows, that is almost always WRONG — 32 is the Round-of-32
+qualifier count (standings.advanced), not any later round. The correct approach derives the
+answer from match winners of the round just before the one asked about (e.g. "reached the
+round of 16" = teams that won their stage='r32' match), not from the standings table. Mark
+this invalid and explain the mismatch in "reason" so the retry doesn't repeat the same query.
+Apply the same logic in reverse too: 16 rows for a "quarter-finalists" question, 8 rows for a
+"semi-finalists" question, or 4 rows for a "finalists" question are the same class of error.
+
 Return ONLY a JSON object:
 {
   "valid": true | false,
@@ -482,6 +504,7 @@ Mark INVALID if:
 - SQL used = for a person's name instead of LIKE
 - Wrong join produced irrelevant results
 - Player stat query returned nothing — suggest checking stat_key spelling or trying tournament_stat_values instead of match_stat_values
+- Row count matches an earlier knockout round's qualifier count instead of the round actually asked about (see CRITICAL CHECK above)
 
 Mark VALID if results correctly answer the question, or empty is genuinely correct.
 
