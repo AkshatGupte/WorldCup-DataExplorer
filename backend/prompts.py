@@ -8,7 +8,7 @@ TABLE teams (
 TABLE matches (
     id TEXT,  -- e.g. '2026-001'
     match_no INTEGER, date TEXT, kickoff_utc TEXT,
-    stage TEXT,  -- 'group_a'..'group_l', 'r32', 'quarter_final', 'semi_final', 'final'
+    stage TEXT,  -- 'group_a'..'group_l', 'r32', 'r16', 'qf', 'sf', 'thirdPlace', 'final'
     home_team TEXT, away_team TEXT,
     home_score INTEGER, away_score INTEGER,
     stadium TEXT, city TEXT, country TEXT, attendance INTEGER,
@@ -21,7 +21,12 @@ TABLE standings (
     team TEXT, played INTEGER, won INTEGER, drawn INTEGER, lost INTEGER,
     goals_for INTEGER, goals_against INTEGER, goal_difference INTEGER,
     points INTEGER, fair_play INTEGER, position INTEGER,
-    advanced INTEGER  -- 1=advanced, 0=eliminated
+    advanced INTEGER  -- 1 = advanced OUT OF THE GROUP STAGE into the Round of 32 ONLY.
+                      -- Does NOT mean reached the Round of 16, quarter-finals, etc. — for
+                      -- any later round, find winners of matches WHERE stage = that round
+                      -- (e.g. "reached the round of 16" = teams that won their stage='r32'
+                      -- match: CASE WHEN home_score > away_score THEN home_team ELSE away_team
+                      -- END, filtered to status='finished').
 )
 
 TABLE players (
