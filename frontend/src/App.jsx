@@ -66,7 +66,7 @@ export default function App() {
       setUpcoming(data)
     } catch (e) {
       console.error('Failed to load today matches', e)
-      setApiError('Backend is not running. Start the API on port 8000 to load matches and live data.')
+      setApiError("Live match data isn't available right now. If the server was idle, it may take up to a minute to wake up — please try again shortly.")
       setUpcoming([])
     }
   }
@@ -120,7 +120,7 @@ export default function App() {
     } catch (e) {
       setError(e?.message || 'Failed to connect to backend.')
       setResult(null)
-      setApiError('Backend is not running. Start the API on port 8000 to use queries and matches.')
+      setApiError("We couldn't reach the server. If it was idle, it may take up to a minute to wake up — please try your search again shortly.")
     }
     setLoading(false)
   }
