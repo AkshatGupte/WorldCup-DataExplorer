@@ -432,57 +432,79 @@ async def run_query(request: Request):
     logging.info("Received query: %s (mode=%s)", question, mode)
     return run(question, mode)
 
+# ESPN's season.slug -> our existing stage key/display-name scheme, so the
+# frontend (Bracket.jsx) needs zero changes despite the data source swap.
+_BRACKET_STAGE_MAP = {
+    "round-of-32":      ("r32",        "Round of 32"),
+    "round-of-16":      ("r16",        "Round of 16"),
+    "quarterfinals":    ("qf",         "Quarter Finals"),
+    "semifinals":       ("sf",         "Semi Finals"),
+    "3rd-place-match":  ("thirdPlace", "Third Place"),
+    "final":            ("final",     "Final"),
+}
+_BRACKET_STAGE_ORDER = ["r32", "r16", "qf", "sf", "thirdPlace", "final"]
+_BRACKET_STAGE_NAMES = {key: name for key, name in _BRACKET_STAGE_MAP.values()}
+
+
 @app.get("/bracket")
 def bracket():
+    """
+    Knockout bracket sourced from ESPN's scoreboard (same feed as /today-matches)
+    instead of the daily-synced worldcup.db — ESPN updates within minutes of a
+    result, so the bracket reflects reality immediately instead of up to 24h later.
+    Group-stage events from this same date range are deliberately skipped; only
+    the knockout-stage slugs above are included.
+    """
     try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT id, stage, home_team, away_team,
-                   home_score, away_score, status
-            FROM matches
-            WHERE stage NOT LIKE 'group_%'
-            ORDER BY
-                CASE stage
-                    WHEN 'r32'        THEN 1
-                    WHEN 'r16'        THEN 2
-                    WHEN 'qf'         THEN 3
-                    WHEN 'sf'         THEN 4
-                    WHEN 'thirdPlace' THEN 5
-                    WHEN 'final'      THEN 6
-                END, id
-        """)
-        rows = [dict(r) for r in cur.fetchall()]
-        conn.close()
-
-        stages = {}
-        for r in rows:
-            s = r["stage"]
-            if s not in stages:
-                stages[s] = []
-            stages[s].append({
-                "id":         r["id"],
-                "home":       r["home_team"] or "TBD",
-                "away":       r["away_team"] or "TBD",
-                "home_score": r["home_score"],
-                "away_score": r["away_score"],
-                "status":     r["status"],
-                "finished":   r["status"] == "finished"
-            })
-
-        return {
-            "stages": [
-                {"name": "Round of 32",    "key": "r32",        "matches": stages.get("r32", [])},
-                {"name": "Round of 16",    "key": "r16",        "matches": stages.get("r16", [])},
-                {"name": "Quarter Finals", "key": "qf",         "matches": stages.get("qf", [])},
-                {"name": "Semi Finals",    "key": "sf",         "matches": stages.get("sf", [])},
-                {"name": "Third Place",    "key": "thirdPlace", "matches": stages.get("thirdPlace", [])},
-                {"name": "Final",          "key": "final",      "matches": stages.get("final", [])},
-            ]
-        }
+        res = requests.get(
+            "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard",
+            params={"dates": "20260624-20260720"},
+            timeout=10,
+        )
+        res.raise_for_status()
+        events = res.json().get("events", [])
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logging.exception("Failed to fetch bracket from ESPN API")
+        raise HTTPException(status_code=502, detail=f"ESPN API error: {e}")
+
+    stages = {key: [] for key in _BRACKET_STAGE_ORDER}
+    for event in events:
+        slug = event.get("season", {}).get("slug")
+        mapped = _BRACKET_STAGE_MAP.get(slug)
+        if not mapped:
+            continue
+        key, _ = mapped
+
+        comp = event.get("competitions", [{}])[0]
+        competitors = comp.get("competitors", [])
+        home = next((c for c in competitors if c.get("homeAway") == "home"), {})
+        away = next((c for c in competitors if c.get("homeAway") == "away"), {})
+        status = comp.get("status", {}).get("type", {})
+
+        def _score(c):
+            v = c.get("score")
+            return int(v) if v not in (None, "") else None
+
+        stages[key].append({
+            "id":          event.get("id"),
+            "home":        home.get("team", {}).get("displayName") or "TBD",
+            "away":        away.get("team", {}).get("displayName") or "TBD",
+            "home_score":  _score(home),
+            "away_score":  _score(away),
+            "status":      status.get("description"),
+            "finished":    bool(status.get("completed")),
+            # explicit winner flag (not just score comparison) since a penalty-shootout
+            # win still reports a tied regulation/ET score in home_score/away_score
+            "home_winner": bool(home.get("winner")),
+            "away_winner": bool(away.get("winner")),
+        })
+
+    return {
+        "stages": [
+            {"name": _BRACKET_STAGE_NAMES[key], "key": key, "matches": stages[key]}
+            for key in _BRACKET_STAGE_ORDER
+        ]
+    }
 
 
 # Serves the built frontend (npm run build -> frontend/dist) from this same app,

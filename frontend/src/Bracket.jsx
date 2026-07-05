@@ -10,8 +10,11 @@ const STAGE_COLORS = {
 }
 
 function MatchCard({ match }) {
-  const homeWon = match.finished && match.home_score > match.away_score
-  const awayWon = match.finished && match.away_score > match.home_score
+  // prefer the explicit winner flag when present — a penalty-shootout win still
+  // reports a tied regulation/ET score, so comparing scores alone would miss it
+  const hasWinnerFlag = match.home_winner !== undefined || match.away_winner !== undefined
+  const homeWon = match.finished && (hasWinnerFlag ? match.home_winner : match.home_score > match.away_score)
+  const awayWon = match.finished && (hasWinnerFlag ? match.away_winner : match.away_score > match.home_score)
 
   return (
     <div style={{
