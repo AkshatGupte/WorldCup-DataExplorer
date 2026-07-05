@@ -735,15 +735,33 @@ tbody tr:nth-child(even) {
 
 .sql-block {
   margin: 0;
-  padding: 12px;
+  padding: 14px 16px;
   border-radius: 8px;
   background: var(--panel-2);
   border: 1px solid rgba(242, 195, 0, 0.14);
   color: var(--text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 14px;
+  line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.sql-tok-keyword {
+  color: #7aa2f7;
+  font-weight: 700;
+}
+
+.sql-tok-function {
+  color: #bb9af7;
+}
+
+.sql-tok-string {
+  color: #9ece6a;
+}
+
+.sql-tok-number {
+  color: #73daca;
 }
 
 .leaderboard-grid {

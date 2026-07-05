@@ -1,4 +1,5 @@
 import ChartRenderer from './ChartRenderer'
+import SqlBlock from './SqlBlock'
 import { formatLabel } from '../chartTheme'
 
 function formatCell(value) {
@@ -105,13 +106,13 @@ export default function ResultPanel({ loading, loadingElapsed, result, answeredQ
               {result.sql.primary && (
                 <>
                   <div className="sql-label">Primary</div>
-                  <pre className="sql-block">{result.sql.primary}</pre>
+                  <SqlBlock sql={result.sql.primary} />
                 </>
               )}
               {result.sql.secondary && (
                 <>
                   <div className="sql-label">Stats</div>
-                  <pre className="sql-block">{result.sql.secondary}</pre>
+                  <SqlBlock sql={result.sql.secondary} />
                 </>
               )}
             </div>
